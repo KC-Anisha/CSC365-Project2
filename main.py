@@ -17,47 +17,8 @@ class Node(object):
         self.leaf = True
         self.degree = degree
         self.keys = []
+        # Either child nodes or the actual values depending on if it's an internal node or a leaf node
         self.values = []
-
-    def add(self, key, value):
-        # Add a key value pair to the node
-        # If this node is empty, let's just insert the key and value
-        if not self.keys:
-            self.keys.append(key)
-            self.values.append([value])
-            return None
-
-        for i, existingKey in enumerate(self.keys):
-            # If there is an existing key that matches the new one, just add to the list of values
-            if key == existingKey:
-                self.values[i].append(value)
-                break
-            # If the new key is smaller, insert it to the left
-            elif key < existingKey:
-                self.keys = self.keys[:i] + [key] + self.keys[i:]
-                self.values = self.values[:i] + [[value]] + self.values[i:]
-                break
-            # If the new key is bigger, insert to the right of all keys
-            elif i + 1 == len(self.keys):
-                self.keys.append(key)
-                self.values.append([value])
-
-    # Need to be able to split the node into two and store them as child nodes
-    def split(self):
-        left = Node(self.degree)
-        right = Node(self.degree)
-        mid = self.degree // 2
-
-        left.keys = self.keys[:mid]
-        right.keys = self.keys[mid:]
-
-        left.values = self.values[:mid]
-        right.values = self.values[mid:]
-
-        # After we split the node, we need to set the parent key to the most-left key of the right child
-        self.keys = [right.keys[0]]
-        self.values = [left, right]
-        self.leaf = False
 
     # Check if the node is full (based on the degree)
     def isFull(self):
@@ -112,22 +73,6 @@ class BPlusTree(object):
                 return node.values[i], i
             return node.values[i + 1], i + 1
 
-    # Merge - we need to get a pivot from the child that will be inserted in the keys of the parent
-    # node. We also need to insert the values from the child into the values of the parent
-    def merge(self, parent, child, index):
-        parent.values.pop(index)
-        pivot = child.keys[0]
-
-        for i, parentKey in enumerate(parent.keys):
-            if pivot < parentKey:
-                parent.keys = parent.keys[:i] + [pivot] + parent.keys[i:]
-                parent.values = parent.values[:i] + child.values
-                break
-            elif i + 1 == len(parent.keys):
-                parent.keys += [pivot]
-                parent.values += child.values
-                break
-
     # Inserting a key and value pair
     # Need to traverse to a leaf node. If the leaf node is full, we need to split it
     def insert(self, key, value):
@@ -139,20 +84,65 @@ class BPlusTree(object):
             parent = child
             child, index = self.find(child, key)
 
-        child.add(key, value)
+        # Add key value pair
+        # If node is empty, just insert
+        if not child.keys:
+            child.keys.append(key)
+            child.values.append([value])
+        else:
+            for i, existingKey in enumerate(child.keys):
+                # If there is an existing key that matches the new one, just add to the list of values
+                if key == existingKey:
+                    child.values[i].append(value)
+                    break
+                # If the new key is smaller, insert it to the left
+                elif key < existingKey:
+                    child.keys = child.keys[:i] + [key] + child.keys[i:]
+                    child.values = child.values[:i] + [[value]] + child.values[i:]
+                    break
+                # If the new key is bigger, insert to the right of all keys
+                elif i + 1 == len(child.keys):
+                    child.keys.append(key)
+                    child.values.append([value])
 
         # If the leaf node is full, we need to split it
         if child.isFull():
-            child.split()
+            # Split the node into two and store them as child nodes
+            left = Node(child.degree)
+            right = Node(child.degree)
+            mid = child.degree // 2
+
+            left.keys = child.keys[:mid]
+            right.keys = child.keys[mid:]
+
+            left.values = child.values[:mid]
+            right.values = child.values[mid:]
+
+            # After we split the node, we need to set the parent key to the most-left key of the right child
+            child.keys = [right.keys[0]]
+            child.values = [left, right]
+            child.leaf = False
 
             # After splitting, we have an internal node and two leaf nodes. We need to put these back into the tree
-            if parent and not parent.isFull():
-                self.merge(parent, child, index)
+            if parent and parent.isFull() is False:
+                # Merge - we need to get a pivot from the child that will be inserted in the keys of the parent
+                # node. We also need to insert the values from the child into the values of the parent
+                parent.values.pop(index)
+                pivot = child.keys[0]
+
+                for i, parentKey in enumerate(parent.keys):
+                    if pivot < parentKey:
+                        parent.keys = parent.keys[:i] + [pivot] + parent.keys[i:]
+                        parent.values = parent.values[:i] + child.values
+                        break
+                    elif i + 1 == len(parent.keys):
+                        parent.keys += [pivot]
+                        parent.values += child.values
+                        break
 
     # Search for a key's value
     def search(self, key):
         child = self.root
-
         # All data is held at the leaf nodes
         while not child.leaf:
             child, index = self.find(child, key)
@@ -181,6 +171,7 @@ class BPlusTree(object):
     def printLevels(self, levels):
         self.root.printLevels(levelsToPrint=levels)
 
+    # Print the leaves
     def printLeaves(self):
         self.root.printLeaves()
 
@@ -259,7 +250,7 @@ if __name__ == '__main__':
     # Read the CSV file and store it as an array of JSON
     print("Reading Project 1 - Task 1 CSV file ...")
     df = pd.read_csv("VAERS_COVID_DataAugust2021.csv", encoding="ISO-8859-1", engine='python')
-    # df = pd.read_csv("VAERS_COVID_DataAugust2021.csv", encoding="ISO-8859-1", engine='python', nrows=35)
+    # df = pd.read_csv("VAERS_COVID_DataAugust2021.csv", encoding="ISO-8859-1", engine='python', nrows=10)
     data = json.loads(pd.DataFrame.to_json(df, orient='records'))
 
     print('Initializing B+ tree...')
@@ -278,8 +269,7 @@ if __name__ == '__main__':
     # for i in range(depth):
     #     tree.printLevels([i])
 
-
-    print('\nRetrieving values with key 902465')
+    print('\nGetting values with key 902465')
     print(tree.search(902465))
 
     # The VAERS database added new data in September.The new updated files for 2021 are given below.Insert the new
@@ -310,7 +300,6 @@ if __name__ == '__main__':
         tree.printLevels([i])
     sys.stdout.close()
     sys.stdout = stdoutOrigin
-
 
     # print('\nJust the head')
     # tree.printHead()
