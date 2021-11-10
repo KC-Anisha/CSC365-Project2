@@ -1,14 +1,12 @@
 import copy
 import json
-import random
 import sys
 from functools import reduce
 
 import pandas as pd
-import math
 
 depth = 1
-
+numberOfKeys = 0
 
 class Node(object):
     # Node - can be either a regular node or a leaf node
@@ -60,13 +58,21 @@ class Node(object):
             for child in self.values:
                 child.printLeaves()
 
+    # Get the total number of keys in the tree
+    def getNumberOfKeys(self):
+        global numberOfKeys
+        numberOfKeys = numberOfKeys + len(self.keys)
+        if not self.leaf:
+            for child in self.values:
+                child.getNumberOfKeys()
+
 
 class BPlusTree(object):
     # User gives the degree
     def __init__(self, degree):
         self.root = Node(degree)
 
-    # Return where the given key should be inserted and the list of values at that index
+    # Return where the given key should be and the list of values at that index
     def find(self, node, key):
         for i, existingKey in enumerate(node.keys):
             if key < existingKey:
@@ -250,7 +256,7 @@ if __name__ == '__main__':
     # Read the CSV file and store it as an array of JSON
     print("Reading Project 1 - Task 1 CSV file ...")
     df = pd.read_csv("VAERS_COVID_DataAugust2021.csv", encoding="ISO-8859-1", engine='python')
-    # df = pd.read_csv("VAERS_COVID_DataAugust2021.csv", encoding="ISO-8859-1", engine='python', nrows=10)
+    # df = pd.read_csv("VAERS_COVID_DataAugust2021.csv", encoding="ISO-8859-1", engine='python', nrows=50)
     data = json.loads(pd.DataFrame.to_json(df, orient='records'))
 
     print('Initializing B+ tree...')
@@ -261,13 +267,8 @@ if __name__ == '__main__':
     for item in data:
         tree.insert(item['VAERS_ID'], item)
 
-    # tree.printTree()
     depth = tree.getDepth()
     print('\nDepth: ' + str(depth))
-
-    # print('\nPrint level by level')
-    # for i in range(depth):
-    #     tree.printLevels([i])
 
     print('\nGetting values with key 902465')
     print(tree.search(902465))
@@ -301,8 +302,6 @@ if __name__ == '__main__':
     sys.stdout.close()
     sys.stdout = stdoutOrigin
 
-    # print('\nJust the head')
-    # tree.printHead()
-    #
-    # print('\nThe leaves')
-    # tree.printLeaves()
+    tree.root.getNumberOfKeys()
+    print('\nThe number of keys stored: ' + str(numberOfKeys))
+
